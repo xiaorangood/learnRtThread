@@ -5,6 +5,9 @@
 	- [第一步：创建文件夹](#第一步创建文件夹)
 	- [第二步：新建工程](#第二步新建工程)
 	- [第三步：新建文件组](#第三步新建文件组)
+	  - [创建的文件](#创建的文件)
+	  - [添加文件组](#添加文件组)
+	  - [编写main代码](#编写main代码)
 - [第2章 裸机系统多线程系统](#第2章-裸机系统多线程系统)
 	- [2.1 三种系统比较](#21-三种系统比较)
 		- [2.1.1 轮询系统](#211-轮询系统)
@@ -55,47 +58,65 @@
    <img src=".\README.assets\image-20210221083620720.png" alt="image-20210221083620720" style="zoom:67%;" />
 
 6. 创建后的工程目录
+
    <img src=".\README.assets\image-20210221083845455.png" alt="image-20210221083845455" style="zoom: 80%;" />
 <p  align="right"><a href="#目录">回到目录</a></p>
 
 ## 第三步：新建文件组
 
-创建文件：
+### 创建的文件
 
 1. User文件夹：main.c
 2. Doc文件夹：readme.txt
 
-添加文件组：
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+### 添加文件组
 
 1. 最左侧的Project目录里，在“Target 1”上右击，选择“Manage Project Item”。
+
 2. 在弹出的窗口“Manage Project Items”中，点击Groups文件右侧New按钮，添加group，包括user，rtt/ports，rtt/source，doc。
+
 3. 选中user group，点击Add Files，在弹出的串口中，选择添加User文件夹下的main.c文件。
+
    <img src=".\README.assets\image-20210221085507790.png" alt="image-20210221085507790" style="zoom: 80%;" />
+   
 4. 选中doc group，点击Add Files，在弹出的窗口中，选择添加Doc文件夹下的readme.txt文件。
+
 5. 点击窗口“Manage Project Items”中的OK，保存所有设置。（一定要点击OK，不然窗口内所有设置无效）
+
 6. 设置结束的工程目录
+
    <img src=".\README.assets\image-20210221090434956.png" alt="image-20210221090434956" style="zoom:80%;" />
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+### 编写main代码
 
 编写[main.c](./01-NewProject/User/main.c)代码，点击菜单栏Project -> build Target，若没有错误、警告，则工程可用。
 
-调试配置
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+## 调试配置
 
 1. 工程目录窗口中，在Target 1上右击，选择 Options for Target 1
 
 2. 设置仿真模式是软件仿真
    窗口中选择Debug标签页，选择Use Simulator
-   <img src=".\README.assets\image-20210221091713804.png" alt="image-20210221091713804" style="zoom:80%;" />
+
+<img src=".\README.assets\image-20210221091713804.png" alt="image-20210221091713804" style="zoom:80%;" />
 
 3. 修改时钟大小
    窗口中选择Target标签页，设置时钟频率为25Mhz。时钟频率由system_ARMCM3.c文件中的**SYSTEM_CLOCK**宏定义决定，数值单位是Hz。
+
    <img src=".\README.assets\image-20210221091853735.png" alt="image-20210221091853735" style="zoom:80%;" />
 
 4. 添加头文件路径
    窗口中选择 C/C++ 标签页，在Include Paths中添加头文件的搜索路径。
    ```
-..\User;..\trrhtread\3.0.3\bsp;..\rtthread\3.0.3\components\finsh;..\rtthread\3.0.3\include\libc;..\rtthread\3.0.3\include
+    ..\User;..\trrhtread\3.0.3\bsp;..\rtthread\3.0.3\components\finsh;..\rtthread\3.0.3\include\libc;..\rtthread\3.0.3\include
    ```
-<img src=".\README.assets\image-20210221093224514.png" alt="image-20210221093224514" style="zoom:80%;" />
+   <img src=".\README.assets\image-20210221093224514.png" alt="image-20210221093224514" style="zoom:80%;" />
 <p  align="right"><a href="#目录">回到目录</a></p>
 
 
@@ -253,9 +274,19 @@ int main(void)
 }
 ```
 
-修改[main.c](./02-PollingSystem/User/main.c)文件后，编译代码。打开Debug（菜单栏Debug -> Start/Stop Debug Session）运行程序；打开Logic Analyzer工具（菜单栏View -> Analysis Windows -> Logic Analyzer）；在代码界面中，选择需要添加到逻辑分析仪工具的变量（选择变量 -> 右击 -> Add flag1 to -> LogicAnalyzer）。选择添加的flag1和flag2变量，右击选择Bit模式。
+修改[main.c](./02-PollingSystem/User/main.c)文件后，编译代码。
 
-<img src=".\README.assets\image-20210221181315617.png" alt="image-20210221181315617" style="zoom:67%;" /><img src=".\README.assets\image-20210221181530872.png" alt="image-20210221181530872" style="zoom:80%;" />
+启动逻辑分析仪：
+
+1. 打开Debug（菜单栏Debug -> Start/Stop Debug Session）运行程序；
+2. 打开Logic Analyzer工具（菜单栏View -> Analysis Windows -> Logic Analyzer）；
+3. 在代码界面中，选择需要添加到逻辑分析仪工具的变量（选择变量 -> 右击 -> Add flag1 to -> LogicAnalyzer）。
+
+<img src=".\README.assets\image-20210221181315617.png" alt="image-20210221181315617" style="zoom:67%;" />
+
+选择添加的flag1和flag2变量，右击选择Bit模式。
+
+<img src=".\README.assets\image-20210221181530872.png" alt="image-20210221181530872" style="zoom:80%;" />
 
 点击运行，获得波形图如下
 
