@@ -14,9 +14,9 @@
   - bsp：存放板级支持包
   - include：头文件
   - include/libc：头文件
-  - libcpu/arm/conrtex-m3：处理器内核相关接口文件（STM32F103使用cortex-m3内核，属于ARM内核）
-  - libcpu/arm/conrtex-m4：处理器内核相关接口文件（STM32F207使用cortex-m3内核，属于ARM内核）
-  - libcpu/arm/conrtex-m7：处理器内核相关接口文件（STM32F407使用cortex-m3内核，属于ARM内核）
+  - libcpu/arm/cortex-m3：处理器内核相关接口文件（STM32F103使用cortex-m3内核，属于ARM内核）
+  - libcpu/arm/cortex-m4：处理器内核相关接口文件（STM32F207使用cortex-m3内核，属于ARM内核）
+  - libcpu/arm/cortex-m7：处理器内核相关接口文件（STM32F407使用cortex-m3内核，属于ARM内核）
   - src：内核源码
 - User：用户代码
 
