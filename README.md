@@ -30,6 +30,7 @@
 		- [3.9.5 系统调度](#395-系统调度)
 	- [3.11 主函数实现](#311-主函数实现)
 	- [3.12 实验现象](#312-实验现象)
+- [第4章 临界段保护](#第4章-临界段保护)
 
 
 
@@ -635,3 +636,52 @@ void rt_schedule(void);
 
 <p  align="right"><a href="#目录">回到目录</a></p>
 
+
+
+# 第4章 临界段保护
+
+临界段是一段在执行时不能被中断的代码，常出现在对全局变量的操作。
+
+赋值03-MultiThreadSystem文件夹，重命名为04-MaskInterrupt。
+
+CPS中断关闭指令：
+
+```assembly
+CPAID I ; PRIMASK=1		关中断
+CPSIE I ; PRIMASK=0		开中断
+CPSID F ; FAULTMASK=1	关异常
+CPSIE F ; FAULTMASK=0	开异常
+```
+
+Corttex-M内核中断屏蔽寄存器组
+
+| 寄存器    | 描述                                                         |
+| --------- | ------------------------------------------------------------ |
+| PRIMASK   | 1比特寄存器。<br />置1后，屏蔽所有可屏蔽异常，只剩下NMI和硬FAULT可以响应。<br />默认值为0，表示没有关中断。 |
+| FAULTMASK | 1比特寄存器。<br />置1后，只响应NMI；其他异常，包括硬FAULT，也被忽略。<br />默认值为0，表示没有关闭异常 |
+| BASEPRI   | 最多9比特寄存器。<br />所有优先级大于等于此数值的中断都被屏蔽（优先级号越大，优先级越低）。<br />默认值0，不屏蔽任何中断 |
+
+在[rtthread\3.0.3\libcpu\arm\cortex-m3\context_rvds.s](.\04-MaskInterrupt\rtthread\3.0.3\libcpu\arm\cortex-m3\context_rvds.s)中定义开中断和关中断函数。
+
+在[rtthread\3.0.3\include\rthw.h](04-MaskInterrupt\rtthread\3.0.3\include\rthw.h)中声明开中断和关中断函数。
+
+使用临界段代码是注意事项：通过关中断时保存、开中断时恢复寄存器，来避免中断嵌套
+
+```C
+// 关中断, level1 = 0, PRIMASK=1
+level1 = rt_hw_interrupt_disable();
+{
+    //执行临界段代码1
+    // 关中断，level2 = 1， PRIMASK=1
+    level2 = rt_hw_interrupt_disable();
+    {
+    	//执行临界段代码2
+    }
+    //  开中断，结束临界段代码, level2 = 1, PRIMASK = 1
+    rt_hw_interrupt_enable(level2);
+}
+// 开中断，结束临界段代码, level1 = 0, PRIMASK = 0
+rt_hw_interrupt_enable(level1);
+```
+
+<p  align="right"><a href="#目录">回到目录</a></p>

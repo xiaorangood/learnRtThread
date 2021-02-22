@@ -167,3 +167,22 @@ pendsv_exit
     ALIGN   4
 
     END
+
+;**************************************************
+; 函数原型：rt_base_t rt_hw_interrupt_disable();
+;**************************************************
+rt_hw_interrupt_disable    PROC
+    EXPORT  rt_hw_interrupt_disable
+    MRS     r0, PRIMASK
+    CPSID   I
+    BX      LR
+    ENDP
+
+;**************************************************
+; 函数原型：rt_hw_interrupt_enable(rt_base_t level)
+;**************************************************
+rt_hw_interrupt_enable    PROC
+    EXPORT  rt_hw_interrupt_enable
+    MSR     PRIMASK, r0
+    BX      LR
+    ENDP
