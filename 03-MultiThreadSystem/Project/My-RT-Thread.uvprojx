@@ -388,9 +388,33 @@
         </Group>
         <Group>
           <GroupName>rtt/ports</GroupName>
+          <Files>
+            <File>
+              <FileName>cpuport.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\rtthread\3.0.3\libcpu\arm\cortex-m3\cpuport.c</FilePath>
+            </File>
+            <File>
+              <FileName>context_rvds.s</FileName>
+              <FileType>2</FileType>
+              <FilePath>..\rtthread\3.0.3\libcpu\arm\cortex-m3\context_rvds.s</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>rtt/source</GroupName>
+          <Files>
+            <File>
+              <FileName>thread.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\rtthread\3.0.3\src\thread.c</FilePath>
+            </File>
+            <File>
+              <FileName>scheduler.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\rtthread\3.0.3\src\scheduler.c</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>doc</GroupName>
