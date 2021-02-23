@@ -494,7 +494,7 @@ void rt_hw_context_switch_to(rt_uint32_t to);
 
 ## 3.8 线程初始化
 
-根据在[rtdef.h](./03-MultiThreadSystem/rtthread/3.0.3/include/rtdef.h)文件中定义的线程控制块结构体（struct rt_thread），对内部各个数值赋初值。在[thread.c](rtthread/3.0.3/src/thread.c)文件中定义线程初始化。将thread.c文件添加到rtt/source的group中。
+根据在[rtdef.h](./03-MultiThreadSystem/rtthread/3.0.3/include/rtdef.h)文件中定义的线程控制块结构体（struct rt_thread），对内部各个数值赋初值。在[thread.c](./03-MultiThreadSystem/rtthread/3.0.3/src/thread.c)文件中定义线程初始化。将thread.c文件添加到rtt/source的group中。
 
 - 函数名：rt_thread_init
 - 输入参数
@@ -685,3 +685,58 @@ rt_hw_interrupt_enable(level1);
 ```
 
 <p  align="right"><a href="#目录">回到目录</a></p>
+
+
+
+# 第5章 对象容器
+
+复制04-MaskInterrupt重命名为05-ObjectContainer.
+
+需要新建的文件：
+
+1. rtthread\3.0.3\src\object.c文件：定义对象容器及其操作。添加到工程的rrt/src的group
+2. rtthread\3.0.3\src\kservice.c文件：一般性公共操作。添加到工程的rrt/src的group
+
+定义内核对象，修改对应文件
+
+- [rtconfig.h](.\05-ObjectContainer\User\rtconfig.h)文件中，添加内核对象最长名字的宏定义RT_NAME_MAX
+- [rtdef.h](.\05-ObjectContainer\rtthread\3.0.3\include\rtdef.h)文件中，添加
+  - 内核对象结构体定义：struct rt_object
+  - 内核对象结构体指针类型：rt_object_t
+  - 内核对象类型美剧类型：enum rt_object_class_type
+  - 在原线程控制块类型rt_thread开始处添加定义：
+    - 对象名：name
+    - 对象类型：type
+    - 对象状态：flag
+    - 对象的双向链表节点：list
+
+定义对象容器，即内核对象信息的数组：
+
+- 每次创建的对象，都要放到对象容器中管理
+- 对象容器就是一个全局数组变量
+- 在[rtdef.h](.\05-ObjectContainer\rtthread\3.0.3\include\rtdef.h)文件中定义内核对象信息列表结构体：struct rt_object_information，包括
+  - 对象信息列表的类型：type（与内核对象类型不同）
+  - 对象双向列表节点：object_list
+  - 对象控制块大小：object_size
+- 在[object.c](.\05-ObjectContainer\rtthread\3.0.3\src\object.c)文件中定义容器：
+  - 对象信息的枚举类型：enum rt_object_info_type
+  - 对象容器的定义：static struct rt_object_information rt_object_container[RT_Object_Info_Unknown]
+  - 定义对象信息执行自身的宏：_OBJ_CONTAINER_LIST_INIT
+  - 通过RT_USING_XXXX的宏定义，决定容器的维度大小
+
+容器接口的实现：
+
+- 在[kservice.c](.\05-ObjectContainer\rtthread\3.0.3\src\kservice.c)文件中，实现字符串拷贝的定义，用于复制内核对象名字，并在[rtthread.h](.\05-ObjectContainer\rtthread\3.0.3\include\rtthread.h)文件中声明
+- 在[object.c](.\05-ObjectContainer\rtthread\3.0.3\src\object.c)文件中，定义2个函数
+  - 在对象容器(数组）中，获取指向对象信息（数组元素）的指针：rt_object_get_information
+  - 初始化内核对象，将内核对象插入容器中：rt_object_init（由于对容器操作，需要临界段保护）
+- 在[rtthread.h](.\05-ObjectContainer\rtthread\3.0.3\include\rtthread.h)文件中声明对象初始化函数：rt_object_init
+
+由于线程控控制块多一段信息，需要修改线程控制块的初始化函数：rt_thread_init
+
+- 在[thread.c](./05-ObjectContainer/rtthread/3.0.3/src/thread.c)文件中修改线程控初始化函数的定义：
+  - 输入参数增加一个 name的char*类型
+  - 在函数起始处增加调用内核对象初始化函数：rt_object_init
+
+- 在[rtthread.h](.\05-ObjectContainer\rtthread\3.0.3\include\rtthread.h)文件中，修改线程控制块初始化函数的声明
+- 在[main.c](.\05-ObjectContainer\User\main.c)文件中，修改线程控制块初始化函数的调用
