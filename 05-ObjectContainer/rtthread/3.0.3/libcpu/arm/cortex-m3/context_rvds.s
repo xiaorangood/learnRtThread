@@ -164,10 +164,6 @@ pendsv_exit
     ; PendSV_Handler 子程序结束
     ENDP
 
-    ALIGN   4
-
-    END
-
 ;**************************************************
 ; 函数原型：rt_base_t rt_hw_interrupt_disable();
 ;**************************************************
@@ -186,3 +182,9 @@ rt_hw_interrupt_enable    PROC
     MSR     PRIMASK, r0
     BX      LR
     ENDP
+
+    ALIGN   4
+
+    END
+
+
