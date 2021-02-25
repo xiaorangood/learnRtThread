@@ -127,10 +127,11 @@
 
 3. 修改时钟大小
    
+
 窗口中选择Target标签页，设置时钟频率为25Mhz。时钟频率由system_ARMCM3.c文件中的**SYSTEM_CLOCK**宏定义决定，数值单位是Hz。
-   
+
 <img src=".\README.assets\image-20210221091853735.png" alt="image-20210221091853735" style="zoom:80%;" />
-   
+
 4. 添加头文件路径
 
    窗口中选择 C/C++ 标签页，在Include Paths中添加头文件的搜索路径。
@@ -429,6 +430,21 @@ int main(void)
 相关代码见[context_rvds.s](./03-MultiThreadSystem/rtthread/3.0.3/libcpu/arm/cortex-m3/context_rvds.s)文件。由于牵涉到CPU寄存器的读写，故使用汇编语言编写。
 
 工程中，需要将该文件添加到rtt/ports这个group中。
+
+代码产生指令：
+
+```assembly
+; AREA表示一个新的数据段或代码段
+; .text表示段名，段名两边用“|”包括
+; CODE表示伪代码
+; READONLY表示只读
+; ALIGN=2表示接着指令以2^2=4字节对齐
+; 
+    AREA |.text|, CODE, READONLY, ALIGN=2
+    THUMB
+    REQUIRE8
+    PRESERVE8
+```
 
 主要的函数有
 
@@ -743,3 +759,7 @@ rt_hw_interrupt_enable(level1);
 - 在[main.c](.\05-ObjectContainer\User\main.c)文件中，修改线程控制块初始化函数的调用
 
 <p  align="right"><a href="#目录">回到目录</a></p>
+
+
+
+
