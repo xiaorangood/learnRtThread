@@ -36,6 +36,7 @@
   - [6.2 实现空闲线程](#62-实现空闲线程)
   - [6.3 实现阻塞延时](#63-实现阻塞延时)
   - [6.4 SysTick_Handler中断服务程序](#64-systick_handler中断服务程序)
+  - [6.5 实验结果](#65-实验结果)
 
 
 
@@ -883,11 +884,13 @@ rt_hw_interrupt_enable(level1);
 
 <p  align="right"><a href="#目录">回到目录</a></p>
 
+## 6.5 实验结果
 
+延时20ms翻转，周期40ms。
 
+<img src=".\README.assets\image-20210227140449036.png" alt="image-20210227140449036" style="zoom:80%;" />
 
-
-
+<p  align="right"><a href="#目录">回到目录</a></p>
 
 
 
