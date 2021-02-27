@@ -14,7 +14,6 @@
 		- [2.1.2 前后台系统](#212-前后台系统)
 		- [2.1.4 总结](#214-总结)
 	- [2.2 轮询系统实现变量延时翻转](#22-轮询系统实现变量延时翻转)
-
 - [第3章 多线程系统](#第3章-多线程系统)
 	- [3.1 创建的文件](#31-创建的文件)
 	- [3.2 变量的重定义](#32-变量的重定义)
@@ -32,6 +31,11 @@
 	- [3.12 实验现象](#312-实验现象)
 - [第4章 临界段保护](#第4章-临界段保护)
 - [第5章 对象容器](第5章-对象容器)
+- [第6章 空闲线程与阻塞延时](#第6章-空闲线程与阻塞延时)
+  - [6.1 增改的文件](#61-增改的文件)
+  - [6.2 实现空闲线程](#62-实现空闲线程)
+  - [6.3 实现阻塞延时](#63-实现阻塞延时)
+  - [6.4 SysTick_Handler中断服务程序](#64-systick_handler中断服务程序)
 
 
 
@@ -759,6 +763,132 @@ rt_hw_interrupt_enable(level1);
 - 在[main.c](.\05-ObjectContainer\User\main.c)文件中，修改线程控制块初始化函数的调用
 
 <p  align="right"><a href="#目录">回到目录</a></p>
+
+
+
+
+
+# 第6章 空闲线程与阻塞延时
+
+第5章的线程函数中，使用的软件延时，不能达到最大发挥CPU的目的，通过线程的阻塞延时实现延时。
+
+复制05-ObjectContainer文件夹，并重命名为06-BlockDelay。
+
+## 6.1 增改的文件
+
+新增的文件：
+
+1. rtthread\3.0.3\src\idle.c文件：用于空闲栈的定义。
+2. rtthread\3.0.3\src\irq.c文件：用于定义中断函数。
+3. rtthread\3.0.3\src\clock.c文件：存放时基更新函数。
+
+需要修改的文件：
+
+1. rtthread\3.0.3\include\rtdef.h
+2. rtthread\3.0.3\include\rtservice.h
+3. rtthread\3.0.3\include\rtthread.h
+4. rtthread\3.0.3\src\scheduler.c
+5. rtthread\3.0.3\src\thread.c
+6. User\main.c
+7. User\rtconfig.h
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+## 6.2 实现空闲线程
+
+在[idle.c](.\06-BlockDelay\rtthread\3.0.3\src\idle.c)文件中，实现空闲线程：
+
+- 定义空闲线程栈：rt_thread_stack
+- 定义空闲线程的线程控制块：idle
+- 定义空闲线程的线程函数，线程函数名：rt_thread_idle_entry
+- 实现空闲线程的初始化
+  - 函数名：rt_thread_idle_init
+  - 调用线程初始化函数：rt_thread_init
+  - 将空闲线程的线程控制块插入到线程就绪列表最后一个元素中：rt_thread_priority_table[RT_THREAD_PRIORITY_MAX-1]
+
+在[rtthread.h](.\06-BlockDelay\rtthread\3.0.3\include\rtthread.h)中，声明空闲线程初始化函数rt_thread_idle_init
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+## 6.3 实现阻塞延时
+
+阻塞延时就是当需要延时时，线程不再占用CPU资源；当延时结束后，再次占用CPU资源。
+
+当阻塞延时时，CPU资源由其他线程使用；当所有线程都阻塞延时时，由空闲线程占用CPU资源。
+
+在[rtdef.h](.\06-BlockDelay\rtthread\3.0.3\include\rtdef.h)文件中，对线程控制块增加字段
+
+- 增加线程控制块中字段remaining_tick，用于存放是剩余延时时间。
+
+在[thread.c](.\06-BlockDelay\rtthread\3.0.3\src\thread.c)文件中增代码
+
+- 增加阻塞延时函数
+  - 函数名：rt_thread_delay
+  - 流程：获取当前线程控制块 -> 设置延时剩余时间 -> 进行系统调度
+- 由于阻塞延时函数使用到了在[scheduler.c](.\06-BlockDelay\rtthread\3.0.3\src\scheduler.c)中定义的当前线程rt_current_thread指针，因此需要在本文件开始出声明这个外部变量。
+
+在[scheduler.c](.\06-BlockDelay\rtthread\3.0.3\src\scheduler.c)文件中，修改系统调度函数rt_schedule
+
+- 声明外部定义的三个线程控制块变量
+  - [idle.c](.\06-BlockDelay\rtthread\3.0.3\src\idle.c)中定义的idle
+  - [main.c](.\06-BlockDelay\User\main.c)中定义的rt_flag1_thread
+  - [main.c](.\06-BlockDelay\User\main.c)中定义的rt_flag2_thread
+
+- 修改rt_schedule函数的调度逻辑
+  - 若当前线程时空闲线程idle
+    - 若线程1的线程控制块rt_flag1_thread中，remaining_tick为0时，从当前线程切换到线程1，并更新当前线程指针rt_current_thread
+    - 若线程2的线程控制块rt_flag2_thread中，remaining_tick为0时，从当前线程切换到线程2，并更新当前线程指针rt_current_thread
+    - 其余情况，则直接将函数返回
+  - 若当前线程不是空闲线程idle
+    - 若当前线程为线程1
+      - 若线程2的线程控制块rt_flag2_thread中，remaining_tick为0时，从当前线程切换到线程2，并更新当前线程指针rt_current_thread
+      - 若当前线程的线程控制块中，remaining_tick不为0时，则从当前线程切换到空闲线程，并更新当前线程指针rt_current_thread
+      - 其余情况，则直接返回
+    - 若但钱线程为线程2
+      - 若线程1的线程控制块rt_flag1_thread中，remaining_tick为0时，从当前线程切换到线程1，并更新当前线程指针rt_current_thread
+      - 若当前线程的线程控制块中，remaining_tick不为0时，则从当前线程切换到空闲线程，并更新当前线程指针rt_current_thread
+      - 其余情况，则直接返回
+    - 其余情况，则直接返回
+  - 调用上下文切换函数rt_hw_context_switch
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+## 6.4 SysTick_Handler中断服务程序
+
+通过该中断服务程序，将remaining_tick进行周期性递减，使得系统调度函数中可以判断remaining_tick的数值。
+
+在irq.c文件中，实现：
+
+- 中断进入：rt_interrupt_enter
+- 中断退出：rt_interrupt_leave
+- 两个函数中，由一个变量用来纪律嵌套的中断数。
+
+在clock.c文件中，实现更新时基rt_tick_increace函数
+
+- 对线程控制块优先列表rt_thread_priority_table中的所有线程变量
+- 检查线程中的remaining_tick数值，当大于0的时候自减
+
+在[main.c](.\06-BlockDelay\User\main.c)文件中，
+
+- 实现SysTick的中断服务程序SysTick_Handler，依次调用
+  - 进入中断rt_interrupt_enter
+  - 更新时基rt_tick_increace
+  - 离开中断rt_interrupt_leave
+- 在rtconfig.h文件中，定义RT_TICK_PER_SECOND
+- 在主函数中，配置systick的中断
+  - 关中断
+  - SysTick_Config配置SysTick定时器
+  - 初始化空闲进程rt_thread_idle_init
+- 在线程入口函数flag1_thread_entry和flag2_thread_entry中，调用rt_thread_delay延时函数延时
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+
+
+
+
+
+
 
 
 
