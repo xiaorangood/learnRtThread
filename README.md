@@ -38,6 +38,11 @@
   - [6.4 SysTick_Handler中断服务程序](#64-systick_handler中断服务程序)
   - [6.5 实验结果](#65-实验结果)
 
+- [第7章 多优先级](#第7章-多优先级)
+	- [7.1 线程就绪列表和线程就绪优先级组](#71-线程就绪列表和线程就绪优先级组)
+	- [7.2 添加宏定义](#72-添加宏定义)
+	- [7.3 其他修改的文件](#73-其他修改的文件)
+
 
 
 # 第一部分 实现RT-Thread内核
@@ -894,5 +899,116 @@ rt_hw_interrupt_enable(level1);
 
 
 
+# 第7章 多优先级
 
+将06-BlockDelay复制，并更名为07-ThreadPriority
+
+## 7.1 线程就绪列表和线程就绪优先级组
+
+线程就绪优先级组：用一个bit表示对应优先级，在就绪列表中有没有线程。
+
+在scheduled.c文件中，定义线程就绪优先级组变量：`rt_uint32_t rt_thread_ready_priority_group;`
+
+在kservie.c文件中，定义`__rt_ffs`函数，被置1的最小比特位。通过`__lowest_bit_bitmap`数组，可以快速判断8bit中哪一个bit是最小。
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+## 7.2 添加宏定义
+
+在rtdef.h文件中，添加：
+
+- 线程控制块结构体中增加的字段
+  - 当前优先级：current_priority
+  - 初始优先级：init_priority
+  - 当前优先级掩码：number_mask
+  - 线程错误码：error
+  - 线程状态：stat
+- RT-Thread 线程状态的定义，包括初始化、挂起、Ready等
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+## 7.3 其他修改的文件
+
+在schedule.c文件中，
+
+- 增加全局变量rt_current_priority，来表示当前线程的优先级
+
+- 修改调度器初始化函数（rt_system_scheduler_init），增加初始化当前线程优先级，修改后，函数流程为
+  - 对线程就绪列表（rt_thread_priority_table）中每个元素，调用列表初始化函数（rt_list_init）
+  - 设置当前线程优先级变量（rt_current_priority）为最低优先级，即RT_THRAD_PRIORITY_MAX - 1
+  - 设置当前线程变量（rt_current_thread）为NULL
+  - 设置线程就绪优先级组（rt_thread_ready_priority_group）为0
+- 修改调度器启动函数（rt_system_scheduler_start）
+  - 获取当前最高优先级及当前最高优先级，对应最新的线程。
+  - 设置最高优先级最新线程为将要调用的线程
+  - 调用函数切换到新线程（rt_hw_context_switch_to）
+- 修改系统调度函数（rt_schedule）
+  - 关中断
+  - 获取最高优先级最新线程
+  - 若该线程与当前线程不一样，则
+    - 设置当前线程优先级
+    - 设置原线程指针为档期那线程，当前线程为最高优先级最新线程
+    - 调用上线文切换函数（rt_hw_context_switch）
+  - 开中断
+- 添加调度器插入线程（rt_schedul_insert_thread）
+  - 关中断
+  - 改变线程状态为READY
+  - 将线程插入就绪列表（rt_list_insert_befor）
+  - 设置线程就绪优先级组中对应的位
+  - 关中断
+- 添加调度器删除线程函数（rt_schedule_remove_thread）
+  - 关中断
+  - 将调用链表移除函数（rt_list_remove）将线程从就绪列表中删除
+  - 判断对应优先级是否位空，若为空，则将线程就绪优先级组对应的位清除
+  - 开中断
+
+在rtthread.c文件中，
+
+- 修改线程初始化函数（rt_thread_init）
+  - 增加行数形参：priority
+  - 设置thread对象中新增加的字段
+    - 初始优先级和当前优先级为形参priority的数值
+    - 当前优先级掩码为0
+    - 线程错误码为RT_EOK
+    - 线程状态为RT_THRAD_INIT
+- 添加线程启动函数（rt_thread_startup）
+  - 将原来线程插入线程就绪列表这个函数行为替代
+  - 在函数中设置
+    - 当前优先级为初始优先级
+    - 当前优先级掩码为1左移优先级位
+    - 改变线程状态位挂起
+    - 恢复线程（rt_thread_resume）
+    - 有当前线程（rt_thread_slef），则进行系统调度（rt_schedule）
+- 添加恢复线程函数（rt_thread_resume）
+  - 如若线程非挂起状态，则返回错误代码
+  - 否则，
+    - 关闭中断
+    - 将线程从挂起线程列表中移除（rt_list_remove）
+    - 使用调度器插入线程将线程插入线程就绪列表中
+    - 开中断
+- 添加获取当前线程函数（rt_thread_resume），返回声明为外部变量的当前线程指针（rt_current_thread）
+- 修改阻塞延时函数（rt_thread_delay）
+  - 关中断
+  - 获取当前线程控制块，设置剩余remaining_tick为传入形参数值
+  - 改变线程状态为挂起
+  - 将线程就绪优先级组对应比特位清零
+  - 开中断
+  - 系统调度（rt_schedule）
+
+在idle.c文件中
+
+- 修改空闲线程初始化函数（rt_thread_idle_init）：
+  - 增加线程初始化函数的实参：RT_THREAD_PRIORITY_MAX - 1
+  - 将原调用链表插入函数（rt_list_insert_before）直接将线程控制块链接到就绪列表，替换为线程启动函数（rt_thread_startup）；线程启动函数中的线程恢复函数（rt_thread_resume）会将线程插入就绪列表。
+
+在clock.c文件中
+
+- 修改时基更新函数，当remaining_tick为0时，则将对那个bit位置的就绪优先级组置位
+
+在main.c文件中
+
+- 将线程初始函数，增加优先级实参
+- 使用线程启动函数替换链表插入函数。
+
+<p  align="right"><a href="#目录">回到目录</a></p>
 
