@@ -43,6 +43,20 @@
 	- [7.2 添加宏定义](#72-添加宏定义)
 	- [7.3 其他修改的文件](#73-其他修改的文件)
 
+- [第8章 定时器](#第8章-定时器)
+- [8.1 增加的宏定义](#81-增加的宏定义)
+- [8.2 实现定时器](#82-实现定时器)
+	- [8.2.1 创建系统定时器列表](#821-创建系统定时器列表)
+	- [8.2.2 系统定时器列表初始化](#822-系统定时器列表初始化)
+	- [8.2.3 定时器成员初始化函数](#823-定时器成员初始化函数)
+	- [8.2.4 定时器删除函数](#824-定时器删除函数)
+	- [8.2.5 定时器停止函数](#825-定时器停止函数)
+	- [8.2.6 定时器控制函数](#826-定时器控制函数)
+	- [8.2.7 定时器启动函数](#827-定时器启动函数)
+	- [8.2.8 定时器扫描函数](#828-定时器扫描函数)
+- [8.3 需要修改的文件或函数](#83-需要修改的文件或函数)
+- [8.4 实验现象](#84-实验现象)
+
 
 
 # 第一部分 实现RT-Thread内核
@@ -911,6 +925,8 @@ rt_hw_interrupt_enable(level1);
 
 在kservie.c文件中，定义`__rt_ffs`函数，被置1的最小比特位。通过`__lowest_bit_bitmap`数组，可以快速判断8bit中哪一个bit是最小。
 
+在rtthread.h文件中，声明`__rt_ffs`函数
+
 <p  align="right"><a href="#目录">回到目录</a></p>
 
 ## 7.2 添加宏定义
@@ -950,19 +966,21 @@ rt_hw_interrupt_enable(level1);
     - 设置原线程指针为档期那线程，当前线程为最高优先级最新线程
     - 调用上线文切换函数（rt_hw_context_switch）
   - 开中断
-- 添加调度器插入线程（rt_schedul_insert_thread）
+- 添加调度器插入线程（rt_schedul_insert_thread），在rtthread.h文件中声明
   - 关中断
   - 改变线程状态为READY
   - 将线程插入就绪列表（rt_list_insert_befor）
   - 设置线程就绪优先级组中对应的位
   - 关中断
-- 添加调度器删除线程函数（rt_schedule_remove_thread）
+- 添加调度器删除线程函数（rt_schedule_remove_thread），在rtthread.h文件中声明
   - 关中断
   - 将调用链表移除函数（rt_list_remove）将线程从就绪列表中删除
   - 判断对应优先级是否位空，若为空，则将线程就绪优先级组对应的位清除
   - 开中断
 
-在rtthread.c文件中，
+在thread.c文件中
+
+- 声明为外部变量的当前线程指针（rt_current_thread）
 
 - 修改线程初始化函数（rt_thread_init）
   - 增加行数形参：priority
@@ -971,7 +989,7 @@ rt_hw_interrupt_enable(level1);
     - 当前优先级掩码为0
     - 线程错误码为RT_EOK
     - 线程状态为RT_THRAD_INIT
-- 添加线程启动函数（rt_thread_startup）
+- 添加线程启动函数（rt_thread_startup），在rtthread.h文件中声明
   - 将原来线程插入线程就绪列表这个函数行为替代
   - 在函数中设置
     - 当前优先级为初始优先级
@@ -979,7 +997,7 @@ rt_hw_interrupt_enable(level1);
     - 改变线程状态位挂起
     - 恢复线程（rt_thread_resume）
     - 有当前线程（rt_thread_slef），则进行系统调度（rt_schedule）
-- 添加恢复线程函数（rt_thread_resume）
+- 添加恢复线程函数（rt_thread_resume），在rtthread.h文件中声明
   - 如若线程非挂起状态，则返回错误代码
   - 否则，
     - 关闭中断
@@ -1009,6 +1027,161 @@ rt_hw_interrupt_enable(level1);
 
 - 将线程初始函数，增加优先级实参
 - 使用线程启动函数替换链表插入函数。
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+
+
+## 第8章 定时器
+
+第7章的remaining_tick方案，在时基中断来临时，需要对线程就绪列表所有线程扫描，比较慢。
+
+若每个线程内置一个定时器，需要延时时将线程挂起，并开启定时器，然后插入定时器列表。
+
+定时器列表是一个双线列表，对时间升序，每次时机中断来临时，就扫描系统定时器列表的定时器，就不用全局扫描。
+
+复制07-ThreadPriority重命名为08-Timer
+
+## 8.1 增加的宏定义
+
+在rtdef.h文件中增加如下定义：
+
+- 系统定时器列表大小：RT_TIMER_SKIP_LIST_LEVEL
+- 定义定时器结构体
+  - rt_object类型的成员：parent
+  - 定时器双向列表节点：row
+  - 超时函数：timeout_func
+  - 超时函数形参：parameter
+  - 定时器初始tick数值：init_tick
+  - 定时器超时时，系统的tick数值：timeout_tick
+- 定时器对象的flag宏定义，包括
+  - 定时器是否激活：falg变量的bit0用来表示；置位为激活
+  - 定时器模式：falg变量的bit1用来表示，置位表示周期，清零表示单次
+  - 定时器类型：falg变量的bit3用来表示，置位表示软定时器，清零表示硬件定时器。软件回调函数在定时器线程中调用，硬件定时器在中断处理函数
+- 定时器控制命令宏定义：RT_TIMER_CTRL开头的四个宏，实现定时器设置时间、获取时间、设置一次定时或周期定时。
+
+在redef.h文件中，修改定义
+
+- 在线程控制块结构体中，内置定时器成员
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+## 8.2 实现定时器
+
+创建文件timer.c。
+
+### 8.2.1 创建系统定时器列表
+
+一个rt_list类型的数组，数组的大小由宏定义RT_TIMER_SKIP_LIST_LEVEL决定。
+
+`rt_timer_list`
+
+### 8.2.2 系统定时器列表初始化
+
+`rt_system_timer_init`
+
+该操作是对使得系统定时器列表中，每个元素的next成员和prev成员指向自己。
+
+### 8.2.3 定时器成员初始化函数
+
+`rt_timer_init`
+
+初始化定时器结构体内的内容，包括parent成员，以及超时函数、tick相关参数，定时器列表row。
+
+### 8.2.4 定时器删除函数
+
+`_rt_timer_remove`
+
+该函数入参为一个定时器对象，将该对象的双向列表从列表中移除
+
+### 8.2.5 定时器停止函数
+
+`rt_timer_stop`
+
+步骤：
+
+- 判断timer状态是否为激活状态，若不是，则返回错误
+- 关中断
+- 调用_rt_timer_remove，将定时器从定时器列表中删除
+- 开中断
+- 将定时器的状态设置为非激活状态
+
+### 8.2.6 定时器控制函数
+
+`rt_timer_control`
+
+根据控制宏定义，设置对应的对象成员；入参由定时器timer、命令、参数；参数类型为void*类型。
+
+### 8.2.7 定时器启动函数
+
+将线程对象的定时器的双向列表，按照延时时间做升序排序插入系统定时器列表rt_timer_list中
+
+入参：定时器timer
+
+步骤：
+
+- 关中断，将timer从系统定时器列表中移除，开中断
+- 设置timer的状态为非active状态
+- 获取系统tick数值，计算并设置timeout时间
+- 关中断
+- 查找位置插入
+- 设置定时器标志位激活状态
+- 开中断
+- 返回状态。
+
+### 8.2.8 定时器扫描函数
+
+`rt_timer_check`查询延时是否到期，如果到期就让线程就绪。
+
+步骤：获取系统时间tick数值，将系统定时器列表中，时间小于当前时间的timer。调用timer超时函数。若timer时周期的，设置下一次的时间，否则 设置tiemr位非激活。
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+## 8.3 需要修改的文件或函数
+
+在thread.c文件中
+
+- 添加超时函数`rt_thread_timeout`，步骤有：
+  - 获取timer对应的线程
+  - 设置错误码位超时
+  - 从挂起列表中删除，插入就绪列表
+  - 系统调度`rt_schedule`
+
+- 修改线程初始化函数rt_thread_init，调用定时器初始化函数初始化该线程的timer（rt_timer_init）
+
+- 修改线程延时函数rt_thread_delay，调用线程睡眠函数（rt_thread_sleep）
+
+- 定义线程睡眠函数rt_thread_sleep，不走有
+
+  - 关中断，获取当前线程控制块rt_current_thread
+  - 调用rt_thread_suspend函数挂起线程
+  - 设置当前线程的timer内容，并启动
+  - 开中断，并执行系统调度：rt_schedule
+
+- 定义线程挂起函数rt_thread_suspend，步骤有
+
+  - 判断为就绪状态，否则返回
+  - 关中断，线程从就绪列表移除，对应定时器调用停止定时器函数，从系统定时器列表移除，开中断。
+
+在clock.c文件中
+
+- 修改实际增加函数rt_tick_increace，自增系统tick变量，调用定时器扫描函数rt_timer_check
+- 增加tick数值获取函数rt_tick_get，返回全局变量rt_tick；
+
+在main.c函数中修改
+
+- 增加第3个线程的定义，包括，线程控制块，线程栈，线程入口函数
+- 在设置SysTick后，调用rt_system_timer_init初始化定时器
+- 在第二个线程初始化后面，增加第3个心出初始化，或调用rt_thread_startup函数插入就绪列表
+- 设置第3个线程的延时时间为3
+
+<p  align="right"><a href="#目录">回到目录</a></p>
+
+## 8.4 实验现象
+
+flga1延时40ms，周期80ms；flag2延时20毫秒，周期40毫秒；flga3延时30毫秒，周期60毫秒。
+
+<img src=".\README.assets\image-20210305082949435.png" alt="image-20210305082949435" style="zoom:80%;" />
 
 <p  align="right"><a href="#目录">回到目录</a></p>
 
